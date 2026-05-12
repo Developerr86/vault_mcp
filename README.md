@@ -1,31 +1,45 @@
 # Vault 78 MCP Server
 
-A Model Context Protocol (MCP) server that reads and writes Markdown files from the Vault 78 directory and answers questions using Gemini 2.0.
+A [Model Context Protocol](https://modelcontextprotocol.io) server that interfaces with an Obsidian vault **strictly by spawning subprocesses** to execute CLI commands. No embedded LLM, no REST API, no direct file I/O from Python.
 
-## Features
+## Requirements
 
-- List all Markdown files in the vault
-- Read specific Markdown files
-- Write/update Markdown files
-- Search for content in the vault
-- Ask questions about the vault content using Gemini 2.0
-- Summarize files or the entire vault
+### CLI Tool
+
+The server requires a CLI tool capable of **search**, **read**, **write**, and **append** operations on vault files.
+
+**Recommended (all four operations):** the official Obsidian CLI, enabled from Obsidian desktop **Settings → Community → CLI**. This makes the `obsidian` command available on your system `$PATH`.
+
+Alternatives:
+
+| Tool | Install | Search | Read | Write | Append |
+|---|---|---|---|---|---|
+| `obsidian` | Official Obsidian CLI (enabled in desktop app) | ✅ | ✅ | ✅ | ✅ |
+| PowerShell (Windows) | Built into Windows | ✅ (via `findstr`) | ✅ | ✅ | ✅ |
+| `rg` (ripgrep) | `winget install BurntSushi.ripgrep` | ✅ | ❌ | ❌ | ❌ |
+
+Ensure the CLI tool is either in your system `$PATH` or provide the full path in the `.env` file.
 
 ## Setup
 
-1. Install the required dependencies:
+1. Install the required Python dependencies:
 
 ```bash
-pip install mcp google-generativeai python-dotenv
+pip install mcp python-dotenv
 ```
 
-2. Set up your Gemini API key:
+2. Configure `.env`:
 
-   - Copy `.env.example` to `.env`
-   - Add your Gemini API key to the `.env` file:
-     ```
-     GEMINI_API_KEY=your_api_key_here
-     ```
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your vault path and CLI tool:
+
+```env
+VAULT_ABSOLUTE_PATH=C:\Users\YourName\Vault 78
+OBSIDIAN_CLI_COMMAND=obsidian
+```
 
 3. Run the server:
 
@@ -33,76 +47,79 @@ pip install mcp google-generativeai python-dotenv
 python server.py
 ```
 
-## Using with Claude Desktop or other MCP clients
+## Using with MCP Clients
 
-This MCP server can be used with any MCP-compatible client, such as Claude Desktop:
-
-1. Install the server in Claude Desktop:
+### Option A: `mcp install` (auto-configures the client)
 
 ```bash
 mcp install server.py
 ```
 
-2. Or run it in development mode:
+### Option B: Manual config.json entry
 
-```bash
-mcp dev server.py
+Add the following entry to your MCP client's config file (e.g. Claude Desktop's `claude_desktop_config.json`, or any client that follows the standard schema):
+
+```json
+{
+  "mcpServers": {
+    "vault-78": {
+      "command": "python",
+      "args": [
+        "D:\\path\\to\\vault_mcp\\server.py"
+      ],
+      "env": {
+        "VAULT_ABSOLUTE_PATH": "C:\\Users\\YourName\\Vault 78",
+        "OBSIDIAN_CLI_COMMAND": "obsidian"
+      }
+    }
+  }
+}
 ```
 
-## Available Resources and Tools
+> **Tip:** If you use `uvx`, replace `"command": "python"` with `"command": "uv"` and add `"run"` as the first `args` element.
 
-### Resources
+## Available Tools
 
-- `vault://files` - List all Markdown files in the vault
-- `vault://{file_path}` - Get the content of a specific Markdown file
+| Tool | Description |
+|---|---|
+| `search_vault(query, path=None)` | Search vault content via CLI grep. Narrow with optional path. |
+| `read_note(file_path)` | Read the full content of a specific note. |
+| `write_note(file_path, content)` | Create a new note or overwrite an existing one. |
+| `append_to_note(file_path, content)` | Append text to the end of an existing note. |
 
-### Tools
+## Security
 
-- `write_file(file_path, content)` - Write or update a Markdown file
-- `ask_question(question, file_path=None)` - Ask a question about the vault content
-- `search_vault(query)` - Search for content in the vault
-- `summarize_content(file_path=None)` - Summarize a file or the entire vault
+- **No shell injection:** All user-supplied arguments are passed as safe argument lists to `subprocess`. `shell=True` is never used.
+- **Path traversal prevention:** All file paths are resolved against the vault root and checked — any path escaping the vault (e.g. `../../../etc/shadow`) is rejected with a `PermissionError`.
+- **Extension enforcement:** Only `.md` and `.canvas` files can be read or written.
+- **Timeout safety:** All subprocess calls have a 30-second timeout.
 
 ## Examples
-
-### Listing files
-
-```
-What files are available in the vault?
-```
-
-### Reading a file
-
-```
-Show me the content of BucketList.md
-```
-
-### Writing a file
-
-```
-Create a new file called "Meeting Notes.md" with the following content:
-# Meeting Notes
-- Discussed project timeline
-- Assigned tasks to team members
-- Next meeting scheduled for Friday
-```
-
-### Asking questions
-
-```
-What topics are covered in the Deep Learning tutorial files?
-```
 
 ### Searching
 
 ```
-Search for any mentions of "neural networks" in the vault
+Search for "neural networks" in the vault.
 ```
 
-### Summarizing
+### Reading a note
 
 ```
-Summarize the content of the entire vault
+Show me the content of Projects/Ideas.md
+```
+
+### Writing a note
+
+```
+Create a file called "Daily/2024-01-01.md" with the content:
+# January 1, 2024
+Started the new year with a fresh vault.
+```
+
+### Appending to a note
+
+```
+Add "- Buy groceries" to the end of Todo.md
 ```
 
 ## License

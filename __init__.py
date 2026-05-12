@@ -1,6 +1,8 @@
 """
-Vault 78 MCP Server - A Model Context Protocol server that reads and writes Markdown files
-from the Vault 78 directory and answers questions using Gemini 2.0.
+Vault 78 MCP Server — CLI Wrapper Architecture.
+
+Interfaces with an Obsidian vault strictly by spawning subprocesses
+to execute CLI commands. No embedded LLM, no REST API, no direct file I/O.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
